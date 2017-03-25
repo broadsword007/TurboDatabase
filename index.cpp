@@ -16,7 +16,7 @@ QString Index::getType() const
     return type;
 }
 
-void Index::add_record(Index::List_node *node)
+void Index::add_record(Table::List_node *node)
 {
 
 }
