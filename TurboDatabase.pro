@@ -22,3 +22,6 @@ HEADERS += \
     database.h \
     table.h \
     record.h
+
+DISTFILES += \
+    save

@@ -86,7 +86,8 @@ int main(int argc, char *argv[])
     mydb.createRecord("Students", &r8) ;*/
 
     mydb.deleteRecord("Students", "rollno", "144324") ;
-    mydb.deleteRecord("Students", "rollno", "144075") ;
+    mydb.deleteRecord("Students", "rollno", "144326") ;
     mydb.print_table("Students") ;
+    mydb.save_to_file("") ;
     return a.exec();
 }

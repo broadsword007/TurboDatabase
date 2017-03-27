@@ -4,6 +4,7 @@
 #include <QString>
 #include "record.h"
 //#include "index.h"
+#include <QFile>
 class Index;
 using namespace std;
 
@@ -17,11 +18,7 @@ public:
         List_node* next ;
     };
 private:
-    struct meta_data
-    {
-        QHash<QString, QString> attribute_datatype ;
-        int times_used ;
-    };
+    int times_used ;
     QString table_name ;
     QList<QString> primary_key ;
     QList<Index*> indices ;
@@ -47,6 +44,8 @@ public:
     void insertBefore(List_node* val_record, List_node* current) ;
     void deleteNode(List_node* current) ;
     void replaceNode(List_node* to_replace, List_node* with) ;
+
+    void serialized_to_file(QFile* filehandle) ;
 };
 
 #endif // TABLE_H

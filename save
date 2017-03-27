@@ -1,0 +1,24 @@
+***Database
+***tables
+Students
+###tables
+***table
+Students
+0
+***Attributes
+name
+string
+rollno
+int
+###Attributes
+***data
+Farzam Azhar
+144075
+Faisal Ali
+144321
+Asjad Zaheer
+144333
+Mr. XYZ
+144342
+###data
+###Database

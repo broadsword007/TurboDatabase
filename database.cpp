@@ -1,5 +1,6 @@
 #include "database.h"
-
+#include <QFile>
+#include <QDebug>
 void Database::initialize_from_file()
 {
     /// Use file to initialize
@@ -14,6 +15,32 @@ void Database::fromFile(QString Filename)
 {
     target_file=Filename ;
     initialize_from_file() ;
+}
+
+void Database::save_to_file(QString filename)
+{
+     QFile file("save");
+     if (!file.open(QIODevice::ReadWrite))
+     {
+         qDebug()<<"Unable to open the file!"<<endl ;
+         return;
+     }
+     QString to_be_written="***Database\n" ;
+     to_be_written+="***tables\n" ;
+     for(int i=0; i<tables.size(); i++)
+     {
+         to_be_written+=tables[i]->getTable_name()+"\n" ;
+     }
+     to_be_written+="###tables\n" ;
+     file.write(to_be_written.toLocal8Bit()) ;
+     for(int i=0; i<tables.size(); i++)
+     {
+         tables[i]->serialized_to_file(&file) ;
+     }
+     to_be_written="###Database\n" ;
+     file.write(to_be_written.toLocal8Bit()) ;
+     qDebug()<<"Written to file"<<endl ;
+     return  ;
 }
 
 void Database::addTable(Table *table)

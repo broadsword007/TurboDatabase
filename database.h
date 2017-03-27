@@ -12,6 +12,7 @@ class Database
 public:
     Database();
     void fromFile(QString Filename) ;
+    void save_to_file(QString filename) ;
     void addTable(Table* table) ;
     bool dropTable(QString table_name) ;
     QString getName() const;

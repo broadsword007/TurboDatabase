@@ -1,6 +1,7 @@
 #include "table.h"
 #include "index.h"
 #include <QtDebug>
+#include <QFile>
 QString Table::getTable_name() const
 {
     return table_name;
@@ -121,11 +122,38 @@ void Table::replaceNode(Table::List_node *to_replace, Table::List_node *with)
     else last_record=with ;
     delete to_replace ;
 }
+
+void Table::serialized_to_file(QFile * filehandle)
+{
+    QString to_return="***table\n" ;
+    to_return+=table_name+"\n" ;
+    to_return+=QString::number(times_used)+"\n" ;
+    to_return+="***Attributes\n" ;
+    foreach (QString attr_name, attribute_type_hash.keys())
+    {
+        to_return+=attr_name+"\n" ;
+        to_return+=attribute_type_hash[attr_name]+"\n" ;
+    }
+    to_return+="###Attributes\n" ;
+    to_return+="***data\n" ;
+    List_node* current_node=first_record ;
+    while(current_node)
+    {
+        foreach (QString attr_name, attribute_type_hash.keys()) {
+            to_return+=current_node->record->getAttribute(attr_name)+"\n" ;
+        }
+        current_node=current_node->next ;
+    }
+    to_return+="###data\n" ;
+    filehandle->write(to_return.toLocal8Bit()) ;
+}
+
 Table::Table(QString val_table_name , QHash<QString,QString> val_attribute_type_hash)
 {
     table_name=val_table_name ;
     first_record=NULL ;
     last_record=NULL ;
+    times_used=0;
     attribute_type_hash=val_attribute_type_hash ;
 }
 
