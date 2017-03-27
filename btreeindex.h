@@ -30,7 +30,7 @@ class BTreeIndex : public Index
     Table::List_node* remove_max_record_from_tree(TreeNode* node);
     Table::List_node* remove_min_record_from_tree(TreeNode* node);
 public:
-    BTreeIndex(int val_order, QString val_type, QString val_target_attribute);
+    BTreeIndex(int val_order, QString val_type, QString val_target_attribute, Table* val_targetTable);
     void construct_index(Table::List_node* first_node) ;
     void add_record(Table::List_node* record_node) ;
     Table::List_node* find_record(QString attribute_value);

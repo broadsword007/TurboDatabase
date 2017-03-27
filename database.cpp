@@ -92,3 +92,21 @@ bool Database::deleteRecord(QString tableName, QString where_attribute, QString 
     }
     return false ;
 }
+
+void Database::add_index(QString tablename, Index *index)
+{
+    for(int i=0; i<tables.size(); i++)
+    {
+        if(tables[i]->getTable_name()==tablename)
+        {
+            return tables[i]->addIndex(index) ;
+        }
+    }
+}
+
+void Database::print_table(QString table_name)
+{
+    foreach (Table* table, tables) {
+        if(table->getTable_name()==table_name) {table->print_table() ; return;}
+    }
+}

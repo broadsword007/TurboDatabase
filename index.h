@@ -8,9 +8,10 @@ class Index
 protected:
     QString type ;
     QString target_attribute;
+    Table* targetTable ;
 public:
 
-    Index(QString val_type, QString val_target_attribute);
+    Index(QString val_type, QString val_target_attribute, Table* val_targetTable);
     virtual void construct_index(Table::List_node* first_node)=0 ;
     QString getType() const;
     virtual void add_record(Table::List_node* node)=0 ;

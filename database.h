@@ -21,6 +21,9 @@ public:
     QHash<QString, QString> readRecord(QString tableName, QList<QString> attributes, QString where_attribute, QString equals_value) ;
     bool updateRecord(QString tableName,QString attribute_to_change,QString new_value, QString where_attribute, QString has_value) ;
     bool deleteRecord(QString tableName, QString where_attribute, QString equals_value) ;
+    void add_index(QString tablename, Index* index) ;
+
+    void print_table(QString table_name) ;
 };
 
 #endif // DATABASE_H

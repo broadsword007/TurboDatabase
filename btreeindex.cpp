@@ -26,11 +26,13 @@ BTreeIndex::TreeNode* BTreeIndex::search(BTreeIndex::TreeNode *node, QString att
             return search(node->children[i+1], attribute_value) ; //start searching from rightmost branch
         }
     }
+    return NULL ;
 }
 
 void BTreeIndex::insert(TreeNode *node, Table::List_node *record_node)
 {
-    for(int i=0; i<node->attribute_values.size(); i++)
+    int total_keys=node->attribute_values.size() ;
+    for(int i=0; i<total_keys; i++)
     {
         int comparison_result=QString::compare(record_node->record->getAttribute(target_attribute),node->attribute_values[i],  Qt::CaseInsensitive);
         if(comparison_result<0) // if key is less than current value
@@ -41,10 +43,11 @@ void BTreeIndex::insert(TreeNode *node, Table::List_node *record_node)
                 Table::List_node* after=node->records[i] ; // after is the node which has to come after the node to be inserted
                 if(type=="primary")  // if the index is primary we change the actual order of data as well
                 {
-                    record_node->next=after ;
+                    targetTable->insertBefore(record_node,after) ;
+                    /*record_node->next=after ;
                     record_node->previous=after->previous ;
                     after->previous->next=record_node ;
-                    after->previous=record_node ;
+                    after->previous=record_node ;*/
                 }
                 node->records.insert(i, record_node) ;
                 node->attribute_values.insert(i, record_node->record->getAttribute(target_attribute));
@@ -52,8 +55,13 @@ void BTreeIndex::insert(TreeNode *node, Table::List_node *record_node)
                 {
                     split(node) ; //split
                 }
+                return ;
             }
-            else insert(node->children[i], record_node) ;
+            else
+            {
+                insert(node->children[i], record_node) ;
+                return ;
+            }
         }
         else if(comparison_result>0 && i==node->attribute_values.size()-1) // if key is greater than all children
         {
@@ -62,19 +70,25 @@ void BTreeIndex::insert(TreeNode *node, Table::List_node *record_node)
                 Table::List_node* before=node->records[i] ; // before is the node which has to come before the node to be inserted
                 if(type=="primary")  // if the index is primary we change the actual order of data as well
                 {
-                    record_node->previous=before ;
+                    targetTable->insertAfter(record_node, before) ;
+                    /*record_node->previous=before ;
                     record_node->next=before->next ;
                     before->next->previous=record_node ;
-                    before->next=record_node ;
+                    before->next=record_node ;*/
                 }
-                node->records.insert(i, record_node) ;
-                node->attribute_values.insert(i, record_node->record->getAttribute(target_attribute));
+                node->records.insert(i+1, record_node) ;
+                node->attribute_values.insert(i+1, record_node->record->getAttribute(target_attribute));
                 if(node->records.size()==order)
                 {
                     split(node) ; //split
                 }
+                return ;
             }
-            else insert(node->children[i+1], record_node) ;
+            else
+            {
+                insert(node->children[i+1], record_node) ;
+                return ;
+            }
         }
     }
 }
@@ -93,7 +107,7 @@ void BTreeIndex::split(BTreeIndex::TreeNode *node)
     for(int i=0; i<breakpoint; i++)
     {
         left_child->records.append(node->records[i]);
-        left_child->children.append(node->children[i]) ;
+        if(node->children.size()>0)left_child->children.append(node->children[i]) ;
         left_child->attribute_values.append(node->attribute_values[i]) ;
         left_child->parent=new_node ;
     }
@@ -101,17 +115,20 @@ void BTreeIndex::split(BTreeIndex::TreeNode *node)
     for(int i=breakpoint+1; i<node->records.size(); i++)
     {
         right_child->records.append(node->records[i]);
-        right_child->children.append(node->children[i]) ;
+        if(node->children.size()>0)right_child->children.append(node->children[i]) ;
         right_child->attribute_values.append(node->attribute_values[i]) ;
         right_child->parent=new_node ;
     }
     new_node->children.append(left_child) ;
     new_node->children.append(right_child) ;
     new_node->parent=node->parent ;
+    left_child->parent=new_node ;
+    right_child->parent=new_node ;
     delete node ;
     if(node->parent==NULL) // is a root node
     {
-        root=node ;
+        root=new_node ;
+        root->parent=NULL ;
     }
     else bubble_up(new_node->parent, new_node) ;
 }
@@ -123,10 +140,13 @@ void BTreeIndex::bubble_up(BTreeIndex::TreeNode *parent, BTreeIndex::TreeNode *n
         int comparison_result=QString::compare(node->attribute_values[0],parent->attribute_values[i],  Qt::CaseInsensitive);
         if(comparison_result< 0) // found where to insert the guest node
         {
+            node->children[1]->parent=parent ;
+            node->children[0]->parent=parent ;
             parent->attribute_values.insert(i, node->attribute_values[0]) ;
             parent->records.insert(i, node->records[0]) ;
-            parent->children[i]=node->children[1] ;
-            parent->children.insert(i-1, node->children[0]) ;
+            parent->children[i]=node->children[0] ;
+            parent->children.insert(i+1, node->children[1]) ;
+            node->parent=parent->parent ;
             if(parent->records.size()==order)
             {
                 split(parent) ;
@@ -155,8 +175,7 @@ int BTreeIndex::get_position_of_parent_key(BTreeIndex::TreeNode *parent_node, BT
     if(parent_node->attribute_values.size()==0) {qDebug()<< "Invalid node!" ; return -1;}
     else if(child_node->attribute_values[0]< parent_node->attribute_values[0])
     {
-        qDebug()<<"Invalid child" ;
-        return -1 ;
+        return 0 ;
     }
     if(child_node->attribute_values[0] > parent_node->attribute_values.last())
     {
@@ -169,6 +188,7 @@ int BTreeIndex::get_position_of_parent_key(BTreeIndex::TreeNode *parent_node, BT
             return i ; // child node is the left child of i-th key in parent
         }
     }
+    return -1 ;
 }
 
 QString BTreeIndex::get_max_val_of_tree(BTreeIndex::TreeNode *node)
@@ -233,9 +253,10 @@ Table::List_node * BTreeIndex::remove_min_record_from_tree(BTreeIndex::TreeNode 
         return remove_min_record_from_tree(node->children.first());
     }
 }
-BTreeIndex::BTreeIndex(int val_order,QString val_type, QString val_target_attribute):Index (val_type, val_target_attribute)
+BTreeIndex::BTreeIndex(int val_order,QString val_type, QString val_target_attribute, Table* val_targetTable):Index (val_type, val_target_attribute, val_targetTable)
 {
     order=val_order ;
+    root=NULL ;
 }
 
 void BTreeIndex::construct_index(Table::List_node *first_node)
@@ -250,6 +271,10 @@ void BTreeIndex::add_record(Table::List_node *record_node)
         root=new TreeNode ;
         root->records.append(record_node) ; //simply insert as root
         root->attribute_values.append(record_node->record->getAttribute(target_attribute));
+        if(type=="primary")
+        {
+            targetTable->insertAtStart(record_node) ;
+        }
         root->parent=NULL ;
     }
     else insert(root, record_node) ;
@@ -271,7 +296,7 @@ bool BTreeIndex::update_record(QString current_value,QString attribute_to_change
     Table::List_node* destination_keynode= ( searched_node ? searched_node->records[index_to_access] : NULL) ;
     if(destination_keynode)
     {
-        destination_keynode->record->setAttribute(target_attribute, new_value) ;
+        destination_keynode->record->setAttribute(attribute_to_change, new_value) ;
         return true ;
     }
     else return false ;
@@ -283,23 +308,21 @@ bool BTreeIndex::delete_record(QString attribute_value)
     int searched_index=index_to_access ;
     if(!searched_node) return false ; // if node is not found return false
     
-    if(searched_node->children.size()==0 && searched_node->attribute_values.size()>(order/2)-1) // leaf && no overflow
+    if(searched_node->children.size()==0 && searched_node->attribute_values.size()>(ceil(order/2.0)-1)) // leaf && no overflow
     {
         // simply remove key from the node case-I
         searched_node->attribute_values.removeAt(searched_index) ;
         Table::List_node * node_to_delete=searched_node->records[searched_index] ;
         if(this->type=="primary")
         {
-            if(this->type=="primary")
-            {
-                if(node_to_delete->previous) node_to_delete->previous->next=node_to_delete->next ;
-                if(node_to_delete->next)node_to_delete->next->previous=node_to_delete->previous ;
-            }
-            delete node_to_delete;
+            targetTable->deleteNode(node_to_delete) ;
+            /*if(node_to_delete->previous) node_to_delete->previous->next=node_to_delete->next ;
+            if(node_to_delete->next)node_to_delete->next->previous=node_to_delete->previous ;*/
         }
         searched_node->records.removeAt(searched_index) ;
+        return true ;
     }
-    else if(searched_node->children.size()>0 && searched_node->attribute_values.size()>(order/2)-1) // non-leaf & no overflow
+    else if(searched_node->children.size()>0 && searched_node->attribute_values.size()>(ceil(order/2.0)-1)) // non-leaf & no overflow
     {
         // case II
 
@@ -307,33 +330,37 @@ bool BTreeIndex::delete_record(QString attribute_value)
         TreeNode* left_subtree= (position_of_key==-1 ? NULL : searched_node->children[position_of_key]) ;
         TreeNode* right_subtree= (position_of_key==-1 ? NULL : searched_node->children[position_of_key+1]) ;
 
-        if(left_subtree->attribute_values.size()>(order/2)-1) // case II-a
+        if(left_subtree->attribute_values.size()>(ceil(order/2.0)-1)) // case II-a
         {
             // replace max value of whole left_subtree  with searched key and remove key
             Table::List_node* max_record= remove_max_record_from_tree(left_subtree) ;
             Table::List_node* record_to_delete= searched_node->records[searched_index] ; ;
             if(this->type=="primary")
             {
-                if(record_to_delete->previous) record_to_delete->previous->next=max_record ;
+                targetTable->replaceNode(record_to_delete, max_record) ;
+                /*if(record_to_delete->previous) record_to_delete->previous->next=max_record ;
                 if(record_to_delete->next) record_to_delete->next->previous=max_record ;
-                delete record_to_delete ;
+                delete record_to_delete ;*/
             }
             searched_node->records[searched_index]=max_record ;
             searched_node->attribute_values[searched_index]=max_record->record->getAttribute(target_attribute) ;
+            return true ;
         }
-        else if(right_subtree->attribute_values.size()>(order/2)-1) // case II-b
+        else if(right_subtree->attribute_values.size()>(ceil(order/2.0)-1)) // case II-b
         {
             // replace max value of whole right_subtree node with searched key and remove key
             Table::List_node* min_record= remove_min_record_from_tree(right_subtree) ;
             Table::List_node* record_to_delete= searched_node->records[searched_index] ; ;
             if(this->type=="primary")
             {
-                if(record_to_delete->previous) record_to_delete->previous->next=min_record ;
+                targetTable->replaceNode(record_to_delete, min_record) ;
+                /*if(record_to_delete->previous) record_to_delete->previous->next=min_record ;
                 if(record_to_delete->next) record_to_delete->next->previous=min_record ;
-                delete record_to_delete ;
+                delete record_to_delete ;*/
             }
             searched_node->records[searched_index]=min_record ;
             searched_node->attribute_values[searched_index]=min_record->record->getAttribute(target_attribute) ;
+            return true ;
         }
         else // case II-c
         {
@@ -343,9 +370,9 @@ bool BTreeIndex::delete_record(QString attribute_value)
             {
                 new_node->attribute_values.append(left_subtree->attribute_values[i]) ;
                 new_node->records.append(left_subtree->records[i]) ;
-                new_node->children.append(left_subtree->children[i]) ;
+                if(left_subtree->children.size()>0) new_node->children.append(left_subtree->children[i]) ;
             }
-            new_node->children.append(left_subtree->children[left_subtree->attribute_values.size()]) ; // copy last children
+            if(left_subtree->children.size()>0) new_node->children.append(left_subtree->children[left_subtree->attribute_values.size()]) ; // copy last children
 
             if(left_subtree->children.size()>0 && right_subtree->children.size()>0) // merging the rightmost subtree of left and leftmost subtree of right
             {
@@ -356,7 +383,7 @@ bool BTreeIndex::delete_record(QString attribute_value)
                 {
                     rightmost_branch_left_subtree->attribute_values.append(leftmost_branch_right_subtree->attribute_values[i]) ;
                     rightmost_branch_left_subtree->records.append(leftmost_branch_right_subtree->records[i]) ;
-                    rightmost_branch_left_subtree->children.append(leftmost_branch_right_subtree->children[i]) ;
+                    if(leftmost_branch_right_subtree->children.size()>0) rightmost_branch_left_subtree->children.append(leftmost_branch_right_subtree->children[i]) ;
                 }
                 rightmost_branch_left_subtree->children.append(leftmost_branch_right_subtree->children[leftmost_branch_right_subtree->attribute_values.size()]) ; // copy last children
             }
@@ -367,19 +394,20 @@ bool BTreeIndex::delete_record(QString attribute_value)
             {
                 new_node->attribute_values.append(right_subtree->attribute_values[i]) ;
                 new_node->records.append(right_subtree->records[i]) ;
-                new_node->children.append(right_subtree->children[i]) ;
+                if(left_subtree->children.size()>0) new_node->children.append(right_subtree->children[i]) ;
             }
 
-            searched_node->parent->attribute_values.removeAt(position_of_key) ;
+            searched_node->attribute_values.removeAt(position_of_key) ;
             if(type=="primary")
             {
-                delete searched_node->parent->records[position_of_key] ;
+                targetTable->deleteNode(searched_node->records[position_of_key]) ;
             }
-            searched_node->parent->records.removeAt(position_of_key) ;
-            delete searched_node->parent->children[position_of_key] ;
-            searched_node->parent->children.removeAt(position_of_key) ;
+            searched_node->records.removeAt(position_of_key) ;
+            delete searched_node->children[position_of_key] ;
+            searched_node->children.removeAt(position_of_key) ;
 
-            searched_node->parent->children[position_of_key]=new_node ;
+            searched_node->children[position_of_key]=new_node ;
+            return true ;
         }
     }
     else
@@ -391,7 +419,7 @@ bool BTreeIndex::delete_record(QString attribute_value)
         int searched_key_position= get_position_of_key_in_node(searched_node, attribute_value) ;
         TreeNode * left_sibling ;
         TreeNode * right_sibling ;
-        if(parent_key_position== searched_node->parent->attribute_values.size()-1)
+        if(parent_key_position== searched_node->parent->attribute_values.size())
         {
             right_sibling=NULL ;
             left_sibling=searched_node->parent->children[parent_key_position] ;
@@ -403,39 +431,42 @@ bool BTreeIndex::delete_record(QString attribute_value)
         }
         else
         {
-            right_sibling=searched_node->parent->children[parent_key_position-1] ;
-            left_sibling=searched_node->parent->children[parent_key_position+1] ;
+            right_sibling=searched_node->parent->children[parent_key_position+1] ;
+            left_sibling=searched_node->parent->children[parent_key_position-1] ;
         }
 
-        if(left_sibling && left_sibling->attribute_values.size()>(order/2)-1)
+        if(left_sibling && left_sibling->attribute_values.size()>(ceil(order/2.0)-1))
         {
             // remove this key and rotate right
-
+            if(type=="primary") targetTable->deleteNode(searched_node->records[searched_key_position]) ;
             searched_node->attribute_values[searched_key_position]=searched_node->parent->attribute_values[parent_key_position] ;
             searched_node->records[searched_key_position]=searched_node->parent->records[parent_key_position] ;
 
-            Table::List_node* rightmost_value_left_subtree= remove_max_record_from_tree(left_sibling) ;
-
+            Table::List_node* rightmost_value_left_subtree= left_sibling->records.last() ;
             searched_node->parent->attribute_values[parent_key_position]=rightmost_value_left_subtree->record->getAttribute(target_attribute) ;
             searched_node->parent->records[parent_key_position]=rightmost_value_left_subtree;
+            return true ;
         }
-        else if(right_sibling && right_sibling->attribute_values.size()>(order/2)-1)
+        else if(right_sibling && right_sibling->attribute_values.size()>(ceil(order/2.0)-1))
         {
             // remove key and rotate left
+            if(type=="primary") targetTable->deleteNode(searched_node->records[searched_key_position]) ;
             searched_node->attribute_values[searched_key_position]=searched_node->parent->attribute_values[parent_key_position] ;
             searched_node->records[searched_key_position]=searched_node->parent->records[parent_key_position] ;
 
-            Table::List_node* leftmost_value_right_subtree= remove_min_record_from_tree(right_sibling) ;
+            Table::List_node* leftmost_value_right_subtree= right_sibling->records.first() ;
 
             searched_node->parent->attribute_values[parent_key_position]=leftmost_value_right_subtree->record->getAttribute(target_attribute) ;
             searched_node->parent->records[parent_key_position]=leftmost_value_right_subtree;
+
+            return true ;
         }
         else
         {
             // merge searched node with any of its siblings along with their common parent
             // this will create node with 2((order/2)-1)+1 keys. Now remove the searched key and we get order-2 keys.
             TreeNode* new_node;
-            bool merged_with_left_sibling=0 ,merged_with_right_sibling=0 ;
+            bool merged_with_left_sibling=0 ;
             if(left_sibling)
             {
                 merged_with_left_sibling=true ;
@@ -448,53 +479,65 @@ bool BTreeIndex::delete_record(QString attribute_value)
                     new_node->attribute_values.append(left_sibling->attribute_values[i]) ;
                     new_node->records.append(left_sibling->records[i]) ;
                 }
+
                 new_node->attribute_values.append(searched_node->parent->attribute_values[parent_key_position]) ;
                 new_node->records.append(searched_node->parent->records[parent_key_position]) ;
+
                 for(int i=0; i< searched_node->attribute_values.size(); i++)
                 {
                     if(i==searched_key_position)
+                    {
+                        if(type=="primary")
+                        {
+                            targetTable->deleteNode(searched_node->records[i]) ;
+                        }
+                    }
+                    else
                     {
                         new_node->attribute_values.append(searched_node->attribute_values[i]) ;
                         new_node->records.append(searched_node->records[i]) ;
                     }
                 }
-            }
+             }
             else
             {
-                merged_with_right_sibling=true ;
+                merged_with_left_sibling=false ;
                 new_node=new TreeNode ;
 
                 //merge with right sibling
+                for(int i=0; i< searched_node->attribute_values.size(); i++)
+                {
+                    if(i==searched_key_position)
+                    {
+                        if(type=="primary")
+                        {
+                            targetTable->deleteNode(searched_node->records[i]) ;
+                        }
+                    }
+                    else
+                    {
+                        new_node->attribute_values.append(searched_node->attribute_values[i]) ;
+                        new_node->records.append(searched_node->records[i]) ;
+                    }
+                }
+
+                new_node->attribute_values.append(searched_node->parent->attribute_values[parent_key_position]) ;
+                new_node->records.append(searched_node->parent->records[parent_key_position]) ;
 
                 for(int i=0; i< right_sibling->attribute_values.size(); i++)
                 {
                     new_node->attribute_values.append(right_sibling->attribute_values[i]) ;
                     new_node->records.append(right_sibling->records[i]) ;
                 }
-                new_node->attribute_values.append(searched_node->parent->attribute_values[parent_key_position]) ;
-                new_node->records.append(searched_node->parent->records[parent_key_position]) ;
-                for(int i=0; i< searched_node->attribute_values.size(); i++)
-                {
-                    if(i!=searched_key_position)
-                    {
-                        new_node->attribute_values.append(searched_node->attribute_values[i]) ;
-                        new_node->records.append(searched_node->records[i]) ;
-                    }
-                    else
-                    {
-                        if(type=="primary")
-                        {
-                            delete searched_node->records[i] ;
-                        }
-                    }
-                }
             }
             int parent_key_merged= (merged_with_left_sibling ? parent_key_position-1 : parent_key_position);
             searched_node->parent->attribute_values.removeAt(parent_key_merged) ;
             searched_node->parent->records.removeAt(parent_key_merged) ;
             delete searched_node->parent->children[parent_key_merged] ;
+            searched_node->parent->children.removeAt(parent_key_merged) ;
             searched_node->parent->children[parent_key_merged]=new_node ;
+            new_node->parent=searched_node->parent ;
+            return true ;
         }
     }
-
 }
